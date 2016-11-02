@@ -430,7 +430,7 @@ var magazines = [
   {name:"Saturday Evening Post", abrv:"SAEV"},
   {name:"Street & Smith", abrv:"STSM"}
 ];
-var dataD = {"BLMA": data, "NEYO": neyoData};
+// var dataD = {"BLMA": data, "NEYO": neyoData};
 
 function genMagSelection() {
   var start = '<select class="form-control mag-select">';
@@ -473,8 +473,8 @@ $(document).ready(function(){
     panel.attr('magabrv', magAbrv);
     panel.addClass("active-panel");
     activePanels.addAbrvs(magAbrv, panel);
-    loadData(magAbrv, dataD[magAbrv]);
-    // loadData(magAbrv);
+    // loadData(magAbrv, dataD[magAbrv]);
+    loadData(magAbrv);
     $(this).remove();
   })
   $(document).on("click", ".glyphicon-remove-circle", function(){ //on remove panel
