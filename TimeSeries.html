@@ -1,11 +1,11 @@
 <link rel="shortcut icon" href=""> 
-
+  
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 <style>
 .main-chart {
   text-align: center;
 }
-.glyphicon-plus{
+.add-line{
   font-size:4.5vw;
   color:#444444;
   opacity: 0.8;
@@ -34,6 +34,11 @@
   top: 3;
   right: 3;
 }
+#zoom-in-btn, #zoom-out-btn {
+  width:40px;
+  height:40px;
+}
+
 </style>
 
 
@@ -42,54 +47,118 @@
     <h1 class="display-4" style="text-align:center;">Circulation of Magazines over Time</h1>
     <div class="row">
       <div class="col-md-12" style="text-align:center;">
-        <svg class="main-chart" width="1080" height="720"></svg>
+        <svg class="main-chart" width="92%" height="72vh" style="display:inline-block"></svg>
+        <div class="buttom-zoom-container" style="display:inline-block; vertical-align:top;">
+          <button class="btn btn=primary" id="zoom-in-btn" style="display:block">
+            <span class="glyphicon glyphicon-plus"></span>
+          </button>
+          <button class="btn btn=primary" id="zoom-out-btn" style="display:block">
+            <span class="glyphicon glyphicon-minus"></span>
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="row" id="data-info">
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel1">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel2">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel3">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel4">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel5">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
         <div class="col-sm-2">
           <div class="col-sm-12 data-panel" id="data-panel6">
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>
           </div>
         </div>
     </div>
   </div>
 </body>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="library/jquery.min.js"></script>
+<script src="library/bootstrap.min.js"></script>
+<script src="library/d3.v4.min.js"></script>
+
+<script src="phpQuery.js"></script>
 
 <script>
+
+function getData(abrv) { //when we can make dynamic queries, change this
+  return circDataByMagId[abrv];
+}
+
+
+function loadData(abrv) {
+  activePanels.datas[abrv] = getData(abrv);
+  updateAxes();
+  drawLine();
+  updateToolTipsWithoutMouse();
+}
+
+
+var activePanels = { //MAIN DATA STRUCTURE
+  abrvs:[],
+  paths:{},
+  datas:{},
+  dataPanels:[$("#data-panel1"), $("#data-panel2"), $("#data-panel3"), $("#data-panel4"), $("#data-panel5"), $("#data-panel6")],
+  addAbrvs:function(abrv, panel){ //gives d3 order so panels don't flip flop
+    var panels = activePanels.dataPanels;
+    function findAbrvAfter() {
+      for (var i = 0; i < panels.length; i++) {
+        if (panels[i].attr("id") == panel.attr("id")) {
+          for (var j = i + 1; j < panels.length; j++) {
+            var magabrv = panels[j].attr("magabrv");
+            if (magabrv) {
+              return magabrv;
+            }
+          }
+        }
+      }
+      return null; //if there are no abbreviations after it, return null
+    }
+    var abrvs = activePanels.abrvs;
+    var abrvAfter = findAbrvAfter();
+    if (abrvAfter == null) {
+      abrvs.push(abrv);
+    } else {
+      for (var i = 0; i < abrvs.length; i++) {
+        if (abrvs[i] == abrvAfter) {
+          abrvs.splice(i, 0, abrv);
+          return;
+        }
+      }
+    }
+  }
+}
+
+
+
+
 var svg = d3.select("svg");
 
-var svgHeight = +svg.attr("height");
-var svgWidth = +svg.attr("width");
+var svgRawHeight = svg.attr("height");
+var svgHeight = +(svgRawHeight.substring(0, svgRawHeight.length - 2)) / 100 * window.innerHeight;
+
+var svgWidth = $("#data-info").width();
 
 var gMargins = {
   top:10,
@@ -114,16 +183,16 @@ var lineRef = g.append("rect") //reference line
 
 var gCharts = svg.append("g") //holds the path and invisible data points
   .attr("id", "gcharts")
-  .attr("transform", "translate("+gMargins.left+","+gMargins.top+")")
-  .attr("height", height - gMargins.top - gMargins.bottom)
-  .attr("width", width - gMargins.right - gMargins.left);
+  .attr("transform", "translate("+gMargins.left+","+gMargins.top+")");
+  // .attr("height", height - gMargins.top - gMargins.bottom)
+  // .attr("width", width - gMargins.right - gMargins.left);
 
 //Generates the path
 var lineFn = d3.line()
         .x(function(d){
-          return xScale(d.Date)})
+          return xScale(d.date)})
         .y(function(d){
-          return yScale(d.Circulation)});
+          return yScale(d.circulation)});
 
 //Clean the data
 var parseTime = d3.timeParse("%d %b %Y");
@@ -155,47 +224,12 @@ var gYAxis = svg.append("g")
 
 var tooltipContainer = d3.select("#data-info");
 
-var gDots = svg.append("g") //contains the dots (follows the line)
+var gTrackerDots = svg.append("g") //contains the dots (follows the line)
   .attr("transform", "translate("+gMargins.left+","+gMargins.top+")")
   .attr("height", height - gMargins.top - gMargins.bottom)
   .attr("width", width - gMargins.right - gMargins.left);
 
-var activePanels = { //MAIN DATA STRUCTURE
-  abrvs:[],
-  paths:{},
-  datas:{},
-  addAbrvs:function(abrv, panel){
-    var panels = activePanels.dataPanels;
-    function findAbrvAfter() {
-      for (var i = 0; i < panels.length; i++) {
-        if (panels[i].attr("id") == panel.attr("id")) {
-          for (var j = i + 1; j < panels.length; j++) {
-            var magabrv = panels[j].attr("magabrv");
-            if (magabrv) {
-              return magabrv;
-            }
-          }
-        }
-      }
-      return null; //if there are no abbreviations after it, return null
-    }
-    var abrvs = activePanels.abrvs;
-    var abrvAfter = findAbrvAfter();
-    if (abrvAfter == null) {
-      abrvs.push(abrv);
-    } else {
-      for (var i = 0; i < abrvs.length; i++) {
-        if (abrvs[i] == abrvAfter) {
-          abrvs.splice(i, 0, abrv);
-          return;
-        }
-      }
-    }
-  },
-  dataPanels:[$("#data-panel1"), $("#data-panel2"), $("#data-panel3"), $("#data-panel4"), $("#data-panel5"), $("#data-panel6")]
-}
-
-function mouseMove() {
+function adjustDotsToolTips(mouse) {
   function closestData(data, mouse) {
     function dist(n1, n2) { //only compare x values
       return n1.x-n2.x;
@@ -209,7 +243,7 @@ function mouseMove() {
     while (maxi > mini) {
       var midi = Math.floor((maxi+mini)/2);
       p = data[midi];
-      p.x = xScale(p.Date);
+      p.x = xScale(p.date);
       var distance = dist(p, mouse);
       if (distance == 0) {
         return data[midi];
@@ -223,13 +257,13 @@ function mouseMove() {
 
     var smallestDist = Infinity;
     var nearbyPs = [];
-    for (var i = -3; i <= 3; i++) { //do a search around
+    for (var i = -3; i <= 3; i++) { //do a search around to make sure
       if (midi+i < 0 || midi + i >= data.length) {
         continue;
       }
       var nearbyP = data[midi+i];
-      nearbyP.x = xScale(nearbyP.Date);
-      nearbyP.y = yScale(nearbyP.Circulation)
+      nearbyP.x = xScale(nearbyP.date);
+      nearbyP.y = yScale(nearbyP.circulation)
       nearbyPs.push(nearbyP)
       var absDistance = Math.abs(dist(nearbyP, mouse));
       if (absDistance < smallestDist) {
@@ -240,7 +274,7 @@ function mouseMove() {
     return p;
   }
 
-  var mouse = d3.mouse(this);
+  
   mouse[0]-=gMargins.left;
   lineRef.attr("x", mouse[0]); //set the location of the reference bar
 
@@ -253,7 +287,7 @@ function mouseMove() {
     closestDataPerLine.push(cData);
   }
 
-  var dots = gDots.selectAll("circle")
+  var dots = gTrackerDots.selectAll("circle")
     .data(closestDataPerLine);
 
   dots.enter() //append new dots
@@ -261,9 +295,9 @@ function mouseMove() {
     .attr("r", 4)
   .merge(dots) //merge update and enter selections
     .attr("fill", function(d){ //putting attr here is a little slower but prevents color bug from happening
-      return d3.color(pathType(d.Title)).darker()})
-    .attr("cx", function(d){return xScale(d.Date)})
-    .attr("cy", function(d){return yScale(d.Circulation)});
+      return d3.color(pathType(d.title)).darker()})
+    .attr("cx", function(d){return xScale(d.date)})
+    .attr("cy", function(d){return yScale(d.circulation)});
 
   dots.exit().remove();
 
@@ -272,37 +306,23 @@ function mouseMove() {
 
   tooltips
     .style("background-color", function(d){
-      return d3.color(pathType(d.Title)).brighter()
+      return d3.color(pathType(d.title)).brighter()
     })
     .html(function(d){
       return '<span class="glyphicon glyphicon-remove-circle panel-remove" aria-hidden="true"></span>'+
-      "<b>"+d.Title+"</b>"+
-      "<br>Circulation: " + (d.Circulation)+
-      "<br>Date: " + formatTime(d.Date);
+      "<b>"+d.title+"</b>"+
+      "<br>Circulation: " + (d.circulation)+
+      "<br>Date: " + formatTime(d.date);
     });
 }
 
-function loadData(abrv, data) {
-  var filename = "data/" +abrv+ "_time_series.csv";
+function mouseMove() {
+  var mouse = d3.mouse(this);
+  adjustDotsToolTips(mouse);
+}
 
-  d3.csv(filename, function(data) {
-      data.forEach(function(d) {
-        d.Date = parseTime(d.Date);
-        //http://stackoverflow.com/questions/10610402/javascript-replace-all-commas-in-a-string
-        d.Circulation = +(d.Circulation.replace(/,/g, ""));
-        d.Price = +d.Price;
-      });
-
-
-      // data.sort(function(a,b) {
-      //   return a.Date > b.Date;
-      // })
-
-      activePanels.datas[abrv] = data;
-      updateAxes();
-      drawLine();
-      
-    });
+function updateToolTipsWithoutMouse() {
+  adjustDotsToolTips([100, 100]);
 }
 
 function updateAxes() {
@@ -316,12 +336,12 @@ function updateAxes() {
 
     xScale
       .range([0, width])
-      .domain([d3.min(allData, function(d){return d.Date;}), 
-        d3.max(allData, function(d){return d.Date;})]); 
+      .domain([d3.min(allData, function(d){return d.date;}), 
+        d3.max(allData, function(d){return d.date;})]); 
 
     yScale
       .range([height, 0])
-      .domain([0, d3.max(allData, function(d){return d.Circulation;})]);
+      .domain([0, d3.max(allData, function(d){return d.circulation;})]);
 
     var xAxis = d3.axisBottom(xScale);
     var yAxis = d3.axisLeft(yScale);
@@ -330,34 +350,48 @@ function updateAxes() {
 }
 
 function drawLine() {
-  gCharts.selectAll("path")
-    .data([])
-    .exit()
+  var paths = gCharts.selectAll("path")
+    .data(activePanels.abrvs)
+  
+  var newPaths = paths.enter()
+    .append("path")
+    .merge(paths)
+      .attr("opacity", 0)
+      .attr("stroke", function(d) {
+        //color based on mag_title
+        return pathType(activePanels.datas[d][0].title);
+      })
+      .attr("fill-opacity", 0)
+      .attr("d", function(d) {
+        return lineFn(activePanels.datas[d]);
+      })
+      .attr("opacity", 1);
+
+  paths.exit()
     .transition()
-    // .duration(100)
     .attr("opacity", 0)
     .remove();
+
+
+  gCharts.selectAll("circle") //not very d3 like
+    .data([])
+    .exit()
+    .remove();
+
 
   var abrvs = activePanels.abrvs;
   var paths = activePanels.paths;
   for (var i = 0; i < abrvs.length; i++) {
     var abrv = abrvs[i];
     var magData = activePanels.datas[abrv];
-    var line1 = gCharts.append("path")
-      .attr("opacity", 0)
-      .attr("stroke", pathType(magData[0].Title))
-      .attr("fill-opacity", 0)
-      .attr("d", lineFn(magData))
-      .transition()
-      .attr("opacity", 1);
 
     var points = gCharts.selectAll(".point")
       .data(magData)
       .enter()
       .append("circle")
-      .attr("cx", function(d){return xScale(d.Date)})
-      .attr("cy", function(d){return yScale(d.Circulation)})
-      .attr("fill", pathType(magData[0].Title))
+      .attr("cx", function(d){return xScale(d.date)})
+      .attr("cy", function(d){return yScale(d.circulation)})
+      .attr("fill", pathType(magData[0].title))
       .attr("r", 0)
       .attr("fill-opacity", 0);
     paths[abrv] = points;
@@ -365,7 +399,7 @@ function drawLine() {
 }
 
 
-//Overlayed rectangle
+//Overlayed rectangle for mouse events (line ref and zoom)
 var overlay = svg.append("rect")
   .attr("width", svgWidth)
   .attr("height", svgHeight)
@@ -373,132 +407,247 @@ var overlay = svg.append("rect")
   .attr("pointer-events", "all")
   .on("mousemove", mouseMove)
   .on("mouseout", function(){lineRef.style("display", "none")})
-  .on("mouseover", function(){lineRef.style("display", "inline")})
+  .on("mouseover", function(){lineRef.style("display", "inline")});
 
-// function zoomAxes(isZoomIn) {
-//   var oldDomain = xScale.domain();
-//   var oldXMin = oldDomain[0];
-//   var oldXMax = oldDomain[1];
 
-//   var minDate = new Date(oldXMin.getTime());
-//   var maxDate = new Date(oldXMax.getTime());
+/*
+Add zoom
+*/
 
-//   var zoomFactor = isZoomIn ? -5 : 5; //5 years
+var zoomState = 1;
 
-//   minDate.setFullYear(minDate.getFullYear() - zoomFactor);
-//   maxDate.setFullYear(maxDate.getFullYear() + zoomFactor);
+function onMouseZoom() {
+  var currZoomState = d3.event.transform.k;
+  if (currZoomState > zoomState) {
+    isZoomIn = true;
+    zoomState = currZoomState;
+  } else if (currZoomState < zoomState) {
+    isZoomIn = false;
+    zoomState = currZoomState;
+  } else {
+    return;
+  }
+  zoomAxes(isZoomIn);
+  adjustDotsToolTips(d3.mouse(this));
+}
 
-//   xScale.domain([minDate, maxDate]);
+function zoomAxes(isZoomIn) {
+  var minDomainYearsRange = 5;
+  var maxDomainYearsRange = 120;
 
-//   var xAxis = d3.axisBottom(xScale);
-//   gXAxis.transition().call(xAxis);
+  var oldDomain = xScale.domain();
+  var oldXMin = oldDomain[0];
+  var oldXMax = oldDomain[1];
 
-//   drawLine();
-// }
+  var minDate = new Date(oldXMin.getTime());
+  var maxDate = new Date(oldXMax.getTime());
 
-function zoomAxes() {
+  var zoomFactor = isZoomIn ? -2 : 2; //3 years
+
+  var minYear = minDate.getFullYear();
+  var maxYear = maxDate.getFullYear();
+
+  if (maxYear - minYear < minDomainYearsRange && isZoomIn) {
+    return;
+  }
+  if (maxYear - minYear > maxDomainYearsRange && !isZoomIn) {
+    return;
+  }
+
+  minDate.setFullYear(minYear - zoomFactor);
+  maxDate.setFullYear(maxYear + zoomFactor);
+
+  xScale.domain([minDate, maxDate]);
+
   var xAxis = d3.axisBottom(xScale);
-  console.log(d3.event.transform)
-  xScale = d3.event.transform.rescaleX(xScale);
-  gXAxis.call(xAxis.scale(xScale));
+  gXAxis.transition().call(xAxis);
+
   drawLine();
 }
 
-// d3.zoomTransformation(this);
+var zoom = d3.zoom()
+  .on("zoom", onMouseZoom);
 
-// var zoom = d3.zoom()
-//   // .x(xScale)
-//   .scaleExtent([1,2])
-//   .translateExtent([[(new Date()).setFullYear(1850), 0], [(new Date()).setFullYear(1970), 0]])
-//   .on("zoom", zoomAxes);
-
-// overlay.call(zoom);
+svg.call(zoom); //add the zoom element
 
 
-// d3.csv("circ_data_by_loc_with_statenames.csv", function(data) {
-//   console.log(data);
-      
-//     });
-</script>
+/**
+Add drag
+*/
 
-
-<script> //begin jquery
-//add new magazines here
-var magazines = [
-  {name:"Black Mask", abrv:"BLMA"},
-  {name:"New Yorker", abrv:"NEYO"},
-  {name:"Saturday Evening Post", abrv:"SAEV"},
-  {name:"Street & Smith", abrv:"STSM"}
-];
-// var dataD = {"BLMA": data, "NEYO": neyoData};
-
-function genMagSelection() {
-  var start = '<select class="form-control mag-select">';
-  start+='<option value="" hidden>Select a magazine</option>';
-  for (var i = 0; i < magazines.length; i++) {
-    var magName = magazines[i].name;
-    var magAbrv = magazines[i].abrv;
-    if (activePanels.abrvs.indexOf(magAbrv) != -1) {
-      continue;
-    }
-    start+="<option value="+magAbrv+">"+magName+"</option>";
-  }
-  var end = '</select>';
-  return start+end;
+var shiftX = 0;
+function dragStarted() {
+  shiftX = 0;
 }
+function dragInProcess() {
+  var minDomainYear = 1850;
+  var maxDomainYear = 1950;
 
-$(document).ready(function(){
+  var shiftRight;
 
-  //populate the dropdown according to the js object
-  var dropDownUl = $("#dropdown-menu");
-  magazines.forEach(function(d){
-    //      <li role="presentation"><a role="menuitem" tabindex="-1" href="#">Black Mask</a></li>
-    var li = $('<li/>')
-      .appendTo(dropDownUl);
+  var dx = d3.event.x;
+  if (dx - shiftX > 0) {
+    shiftRight = true;
+  } else if (dx - shiftX < 0) {
+    shiftRight = false;
+  } else {
+    return;
+  }
 
-    var a = $('<a/>')
-      .text(d.name)
-      .attr("id", d.abrv)
-      .addClass("dropdown-magazine")
-      .appendTo(li);
+  var oldDomain = xScale.domain();
+  var oldXMin = oldDomain[0];
+  var oldXMax = oldDomain[1];
+
+  var minDate = new Date(oldXMin.getTime());
+  var maxDate = new Date(oldXMax.getTime());
+
+  var shiftFactor = shiftRight ? -1 : 1; //1 year
+
+  var minYear = minDate.getFullYear();
+  var maxYear = maxDate.getFullYear();
+
+  if (maxYear > maxDomainYear && !shiftRight) {
+    return;
+  }
+  if (minYear < minDomainYear && shiftFactor) {
+    return;
+  }
+
+  minDate.setFullYear(minYear + shiftFactor);
+  maxDate.setFullYear(maxYear + shiftFactor);
+
+  xScale.domain([minDate, maxDate]);
+
+  var xAxis = d3.axisBottom(xScale);
+  gXAxis.transition().call(xAxis);
+
+  drawLine();
+  adjustDotsToolTips(d3.mouse(this));
+}
+function dragEnded() {}
+
+var drag = d3.drag()
+  .subject(function (d) {return {x: 0, y: d3.event.y}})
+  .on("start", dragStarted)
+  .on("drag", dragInProcess)
+  .on("end", dragEnded);
+
+overlay.call(drag);
+
+
+var circDataByMagId = {};
+var magIdMapTitle = {};
+var magazines = [];
+
+$.when(dbQuery("magazines"), dbQuery("circulation_data")).done(function(csvMag, csvCirc) {
+
+  d3.csvParse(csvMag[0], function(d) {
+      magIdMapTitle[d.magazine_id] = d.title; 
+    });
+
+  allCircData = d3.csvParse(csvCirc[0], function(d) {
+    d.date = new Date(d.year, d.month, d.day);
+    d.circulation = +d.circulation;
+    d.Price = +d.price;
+    d.title = magIdMapTitle[d.magazine_id]
+    d.magazine_id = d.magazine_id; //explicit
+    return d;
   });
 
-  //should use delegations ".on('action', ...)" because I am dyamically adding elements
-  $(document).on("click", ".glyphicon-plus", function(){ //on click plus
-    $(this).parent().html(genMagSelection());
-  });
-  $(document).on("change", ".mag-select", function(){ //on select magazine
-    var magAbrv = $(this).children(":selected").val();
-    var panel = $(this).parent();
-    panel.attr('magabrv', magAbrv);
-    panel.addClass("active-panel");
-    activePanels.addAbrvs(magAbrv, panel);
-    // loadData(magAbrv, dataD[magAbrv]);
-    loadData(magAbrv);
-    $(this).remove();
-  })
-  $(document).on("click", ".glyphicon-remove-circle", function(){ //on remove panel
-    var parent = $(this).parent();
-    var abrv = parent.attr("magabrv");
-    var abrvs = activePanels.abrvs;
-    var index = abrvs.indexOf(abrv);
-    if (index > -1) {
-      abrvs.splice(index, 1);
+
+  for (var i = 0; i < allCircData.length; i++) {
+    var mag_id = allCircData[i].magazine_id;
+    if (!(mag_id in circDataByMagId)) {
+      circDataByMagId[mag_id] = [allCircData[i]];
+    } else {
+      circDataByMagId[mag_id].push(allCircData[i]);
     }
-    parent.removeAttr('magabrv');
-    parent.removeClass("active-panel");
+  }
 
-    updateAxes();
-    drawLine(); //update the chart
 
-    parent.css("background-color", "#999999")
-    $(this).remove()
-    var plusSign = $('<span class="glyphicon glyphicon-plus" aria-hidden="true"></span>');
-    parent.html("");
-    parent.append(plusSign);
-    plusSign.css("transform", "perspective(1px) translateY(-50%)")
+  for (var mag_id in circDataByMagId) {
+    // circDataByMagId[mag_id].sort //currently under the invariant that data is sent sorted
+    magazines.push({name:circDataByMagId[mag_id][0].title, abrv:mag_id});
+  }
 
+
+  $(document).ready(function(){
+    //populate the dropdown according to the js object
+    var dropDownUl = $("#dropdown-menu");
+    magazines.forEach(function(d){
+      //      <li role="presentation"><a role="menuitem" tabindex="-1" href="#">Black Mask</a></li>
+      var li = $('<li/>')
+        .appendTo(dropDownUl);
+
+      var a = $('<a/>')
+        .text(d.name)
+        .attr("id", d.abrv)
+        .addClass("dropdown-magazine")
+        .appendTo(li);
+    });
+
+    //should use delegations ".on('action', ...)" because I am dyamically adding elements
+    $(document).on("click", ".add-line", function(){ //on click plus
+      $(this).parent().html(
+        (function() {
+          var start = '<select class="form-control mag-select">';
+          start+='<option value="" hidden>Select a magazine</option>';
+          for (var i = 0; i < magazines.length; i++) {
+            var magName = magazines[i].name;
+            var magAbrv = magazines[i].abrv;
+            if (activePanels.abrvs.indexOf(magAbrv) != -1) {
+              continue;
+            }
+            start+="<option value="+magAbrv+">"+magName+"</option>";
+          }
+          var end = '</select>';
+          return start+end;
+        })());
+    });
+
+    $(document).on("change", ".mag-select", function(){ //on select magazine
+      var magAbrv = $(this).children(":selected").val();
+      var panel = $(this).parent();
+      panel.attr('magabrv', magAbrv);
+      panel.addClass("active-panel");
+      activePanels.addAbrvs(magAbrv, panel);
+      loadData(magAbrv);
+      $(this).remove();
+    })
+
+    $(document).on("click", ".glyphicon-remove-circle", function(){ //on remove panel
+      var parent = $(this).parent();
+      var abrv = parent.attr("magabrv");
+      var abrvs = activePanels.abrvs;
+      var index = abrvs.indexOf(abrv);
+      if (index > -1) {
+        abrvs.splice(index, 1);
+      }
+      parent.removeAttr('magabrv');
+      parent.removeClass("active-panel");
+
+      updateAxes();
+      drawLine(); //update the chart
+
+      parent.css("background-color", "#999999")
+      $(this).remove()
+      var plusSign = $('<span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>');
+      parent.html("");
+      parent.append(plusSign);
+      plusSign.css("transform", "perspective(1px) translateY(-50%)")
+
+    });
+
+    $("#zoom-in-btn").click(function() { //no need for delegation because it's static
+      zoomAxes(true);
+      updateToolTipsWithoutMouse();
+
+    });
+    $("#zoom-out-btn").click(function() {
+      zoomAxes(false);
+      updateToolTipsWithoutMouse();
+    });
   });
-});
 
+});
 </script>
