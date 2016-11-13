@@ -46,8 +46,8 @@
   <div class="container">
     <h1 class="display-4" style="text-align:center;">Circulation of Magazines over Time</h1>
     <div class="row">
-      <div class="col-md-12" style="text-align:center;">
-        <svg class="main-chart" width="92%" height="72vh" style="display:inline-block"></svg>
+      <div class="col-md-12" style="text-align:center;" height="72%">
+        <svg class="main-chart" width="92%" height="72%" style="display:inline-block"></svg>
         <div class="buttom-zoom-container" style="display:inline-block; vertical-align:top;">
           <button class="btn btn=primary" id="zoom-in-btn" style="display:block">
             <span class="glyphicon glyphicon-plus"></span>
@@ -156,7 +156,7 @@ var activePanels = { //MAIN DATA STRUCTURE
 var svg = d3.select("svg");
 
 var svgRawHeight = svg.attr("height");
-var svgHeight = +(svgRawHeight.substring(0, svgRawHeight.length - 2)) / 100 * window.innerHeight;
+var svgHeight = +(svgRawHeight.substring(0, svgRawHeight.length - 1)) / 100 * window.innerHeight;
 
 var svgWidth = $("#data-info").width();
 
