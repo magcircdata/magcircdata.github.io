@@ -9,7 +9,6 @@
   font-size:4.5vw;
   color:#444444;
   opacity: 0.8;
-  text-align: center;
   margin-left: 0.5vw;
   position: relative;
   top: 50%;
@@ -317,8 +316,8 @@ function adjustDotsToolTips(mouse) {
     .html(function(d){
       return '<span class="glyphicon glyphicon-remove-circle panel-remove" aria-hidden="true"></span>'+
       "<b>"+d.title+"</b>"+
-      "<br>Circulation: " + (d.circulation)+
-      "<br>Date: " + formatTime(d.date);
+      "<br>Circulation:<br>" + (d.circulation)+
+      "<br>Date:<br>" + formatTime(d.date);
     });
 }
 
@@ -640,8 +639,9 @@ $.when(dbQuery("magazines"), dbQuery("circulation_data")).done(function(csvMag, 
       var plusSign = $('<span class="glyphicon glyphicon-plus add-line" aria-hidden="true"></span>');
       parent.html("");
       parent.append(plusSign);
-      plusSign.css("transform", "perspective(1px) translateY(-50%)")
 
+      plusSign.css("top", (parent.height()*0.5)+"px");
+      plusSign.css("transform", "perspective(1px) translateY(-50%)");
     });
 
     $("#zoom-in-btn").click(function() { //no need for delegation because it's static
