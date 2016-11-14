@@ -38,6 +38,9 @@
   width:40px;
   height:40px;
 }
+.col-sm-2 {
+  padding: 10px;
+}
 
 </style>
 
@@ -159,6 +162,7 @@ var svgRawHeight = svg.attr("height");
 var svgHeight = +(svgRawHeight.substring(0, svgRawHeight.length - 2)) / 100 * window.innerHeight;
 
 $("#chart-row").height(svgHeight);
+svg.attr("height", svgHeight);
 
 var svgWidth = $("#data-info").width();
 
