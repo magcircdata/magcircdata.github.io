@@ -315,9 +315,9 @@ function adjustDotsToolTips(mouse) {
     })
     .html(function(d){
       return '<span class="glyphicon glyphicon-remove-circle panel-remove" aria-hidden="true"></span>'+
-      "<b>"+d.title+"</b>"+
-      "<br>Circulation:<br>" + (d.circulation)+
-      "<br>Date:<br>" + formatTime(d.date);
+      "<b>"+d.title+"</b><br>"+
+      "<text>Circulation:</text><br>" + (d.circulation)+
+      "<br><text>Date:</text><br>" + formatTime(d.date);
     });
 }
 
