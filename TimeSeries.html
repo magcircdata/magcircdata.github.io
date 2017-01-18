@@ -113,7 +113,7 @@ function loadData(abrv) {
   activePanels.datas[abrv] = getData(abrv);
   updateAxes();
   drawLine();
-  updateToolTipsWithoutMouse();
+  setDefaultToolTips();
 }
 
 
@@ -207,9 +207,13 @@ var formatTime = d3.timeFormat("%b %e, %Y");
 
 var pathType = d3.scaleOrdinal(d3.schemeCategory10);
 
+var origXScale = d3.scaleTime()
+  .domain([new Date(1923, 10, 23), new Date(1942, 9, 29)])
+  .range([0, width]);
+
 var xScale = d3.scaleTime()
   .domain([new Date(1923, 10, 23), new Date(1942, 9, 29)])
-  .range([0, width]); 
+  .range([0, width]);
 
 var yScale = d3.scaleLinear()
   .domain([0,1])
@@ -326,7 +330,7 @@ function mouseMove() {
   adjustDotsToolTips(mouse);
 }
 
-function updateToolTipsWithoutMouse() {
+function setDefaultToolTips() {
   adjustDotsToolTips([100, 100]);
 }
 
@@ -415,129 +419,21 @@ var overlay = svg.append("rect")
   .on("mouseover", function(){lineRef.style("display", "inline")});
 
 
-/*
-Add zoom
-*/
+//add zoom and pan
 
-var zoomState = 1;
-
-function onMouseZoom() {
-  var currZoomState = d3.event.transform.k;
-  if (currZoomState > zoomState) {
-    isZoomIn = true;
-    zoomState = currZoomState;
-  } else if (currZoomState < zoomState) {
-    isZoomIn = false;
-    zoomState = currZoomState;
-  } else {
-    return;
-  }
-  zoomAxes(isZoomIn);
-  adjustDotsToolTips(d3.mouse(this));
-}
-
-function zoomAxes(isZoomIn) {
-  var minDomainYearsRange = 5;
-  var maxDomainYearsRange = 120;
-
-  var oldDomain = xScale.domain();
-  var oldXMin = oldDomain[0];
-  var oldXMax = oldDomain[1];
-
-  var minDate = new Date(oldXMin.getTime());
-  var maxDate = new Date(oldXMax.getTime());
-
-  var zoomFactor = isZoomIn ? -2 : 2; //3 years
-
-  var minYear = minDate.getFullYear();
-  var maxYear = maxDate.getFullYear();
-
-  if (maxYear - minYear < minDomainYearsRange && isZoomIn) {
-    return;
-  }
-  if (maxYear - minYear > maxDomainYearsRange && !isZoomIn) {
-    return;
-  }
-
-  minDate.setFullYear(minYear - zoomFactor);
-  maxDate.setFullYear(maxYear + zoomFactor);
-
-  xScale.domain([minDate, maxDate]);
-
+function onZoom() {
+  xScale = d3.event.transform.rescaleX(origXScale);
   var xAxis = d3.axisBottom(xScale);
-  gXAxis.transition().call(xAxis);
-
+  gXAxis.call(xAxis);
   drawLine();
+  adjustDotsToolTips(d3.mouse(this)); //not using mouseMove because need 'this'
 }
 
 var zoom = d3.zoom()
-  .on("zoom", onMouseZoom);
+  .scaleExtent([0.5,10])
+  .on("zoom", onZoom);
 
-svg.call(zoom); //add the zoom element
-
-
-/**
-Add drag
-*/
-
-var shiftX = 0;
-function dragStarted() {
-  shiftX = 0;
-}
-function dragInProcess() {
-  var minDomainYear = 1850;
-  var maxDomainYear = 1950;
-
-  var shiftRight;
-
-  var dx = d3.event.x;
-  if (dx - shiftX > 0) {
-    shiftRight = true;
-  } else if (dx - shiftX < 0) {
-    shiftRight = false;
-  } else {
-    return;
-  }
-
-  var oldDomain = xScale.domain();
-  var oldXMin = oldDomain[0];
-  var oldXMax = oldDomain[1];
-
-  var minDate = new Date(oldXMin.getTime());
-  var maxDate = new Date(oldXMax.getTime());
-
-  var shiftFactor = shiftRight ? -1 : 1; //1 year
-
-  var minYear = minDate.getFullYear();
-  var maxYear = maxDate.getFullYear();
-
-  if (maxYear > maxDomainYear && !shiftRight) {
-    return;
-  }
-  if (minYear < minDomainYear && shiftFactor) {
-    return;
-  }
-
-  minDate.setFullYear(minYear + shiftFactor);
-  maxDate.setFullYear(maxYear + shiftFactor);
-
-  xScale.domain([minDate, maxDate]);
-
-  var xAxis = d3.axisBottom(xScale);
-  gXAxis.transition().call(xAxis);
-
-  drawLine();
-  adjustDotsToolTips(d3.mouse(this));
-}
-function dragEnded() {}
-
-var drag = d3.drag()
-  .subject(function (d) {return {x: 0, y: d3.event.y}})
-  .on("start", dragStarted)
-  .on("drag", dragInProcess)
-  .on("end", dragEnded);
-
-overlay.call(drag);
+svg.call(zoom); //add the zoom to the svg
 
 
 var circDataByMagId = {};
@@ -633,6 +529,7 @@ $.when(dbQuery("magazines"), dbQuery("circulation_data")).done(function(csvMag, 
 
       updateAxes();
       drawLine(); //update the chart
+      setDefaultToolTips();
 
       parent.css("background-color", "#999999")
       $(this).remove()
@@ -646,12 +543,12 @@ $.when(dbQuery("magazines"), dbQuery("circulation_data")).done(function(csvMag, 
 
     $("#zoom-in-btn").click(function() { //no need for delegation because it's static
       zoomAxes(true);
-      updateToolTipsWithoutMouse();
+      setDefaultToolTips();
 
     });
     $("#zoom-out-btn").click(function() {
       zoomAxes(false);
-      updateToolTipsWithoutMouse();
+      setDefaultToolTips();
     });
   });
 

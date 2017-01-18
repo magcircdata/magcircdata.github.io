@@ -34,6 +34,7 @@ path:hover {
 <script src="library/jquery.min.js"></script>
 <script src="library/bootstrap.min.js"></script>
 <script src="library/d3.v4.min.js"></script>
+<script src="library/d3-zoom.min.js"></script>
 <script src="library/jquery-ui.js"></script>
 
 <body>
@@ -99,7 +100,7 @@ Resources used:
 Great tooltip css (didn't end up using this though)
 http://bl.ocks.org/Caged/6476579
 
-Geomap and states.json
+Geomap and states.json (used the us-states.json data from it and referenced geomap code)
 http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922
 
 Census data scraped from wikipedia
@@ -121,187 +122,6 @@ Census data scraped from wikipedia
 // console.log(d);
 // console.log(JSON.stringify(d))
 
-var width = 940;
-var height = 600;
-
-var projection = d3.geoAlbersUsa()
-			.translate([width/2, height/2]);
-
-var path = d3.geoPath()
-		.projection(projection);
-
-var svg = d3.select("#svg")
-	.append("svg")
-	.attr("width", width)
-	.attr("height", height);
-
-var gMap = svg.append("g")
-	.attr("width", width)
-	.attr("height", height);
-
-var gLegendScale = svg.append("g")
-	.attr("width", width)
-	.attr("height", height);
-
-var toolTip = d3.select("#toolTip")
-	.style("display", "None");
-svg.on("mouseout", function() {
-	toolTip.transition()
-		.style("display", "None")
-}).on("mouseover", function() {
-	toolTip.transition()
-		.style("display", "block")
-})
-
-
-
-var legendHeight = 25;
-var legendCellWidth = 25;
-gLegendScale.selectAll("rect")
-	.data([0,0,0,0,0,0,0]) //rects for now
-	.enter()
-	.append("rect")
-	.attr("x", function(d, i) {
-		return width-legendCellWidth*8+i*legendCellWidth;
-	})
-	.attr("y", height - legendHeight*2)
-	.attr("width", legendCellWidth)
-	.attr("height", legendHeight)
-	.attr("stroke", "#ffffff")
-	.attr("stroke-width", 1)
-	.attr("fill", "#ffffff");
-
-gLegendScale.selectAll("text")
-	.data([0,0,0,0,0,0,0]) //rects for now
-	.enter()
-	.append("text")
-	.attr("x", function(d, i) {
-		return width-legendCellWidth*8+i*legendCellWidth + (legendCellWidth/2);
-	})
-	.attr("y", height - legendHeight*0.8)
-	.attr("font-size", "10px")
-	.attr("fill", "#444444")
-	// .style("font-family", "")
-	.style("text-anchor", "middle")
-	.style("alignment-baseline", "central");
-	// .attr("stroke", "#ffffff")
-	// .attr("stroke-width", 1)
-	// .attr("fill", "#ff00ff");
-
-var gLegendSuffix = svg.append("g")
-	.attr("width", width)
-	.attr("height", height);
-
-gLegendSuffix.selectAll("text")
-	.data([0])
-	.enter()
-	.append("text")
-	.attr("x", function(d) {
-		return width - 18;
-	})
-	.attr("y", height - legendHeight*0.8)
-	.attr("font-size", "10px")
-	.attr("fill", "#444444")
-	.style("text-anchor", "middle")
-	.style("alignment-baseline", "central")
-	.text("%");
-
-
-
-function separateData(data) {
-	var stateD = {}; //magId:date:state:{mailSubs, singleCopies}
-	for (var i = 0; i < data.length; i++) {
-		var row = data[i];
-		var magId = row.magazine_id;
-		var date = row.sample_period_end_date;
-		var sampleIssueDate = row.sample_issue_date;
-		var state = row.State;
-		var mailSubs = +row.num_mail_subscriptions;
-		var singleCopies = +row.num_single_copy_sales;
-		var totalCirc = mailSubs + singleCopies;
-
-		var decadeDate = date.substring(0, 3) + "0"; //1927 goes to 1920
-		var censusPop = 0;
-
-		var mailSubsCensus = 0;
-		var singleCopiesCensus = 0;
-		var totalCircCensus = 0;
-		if (state in stateCensusData) {
-			censusPop = stateCensusData[state][decadeDate];
-			mailSubsCensus = mailSubs / censusPop;
-			singleCopiesCensus = singleCopies / censusPop;
-			totalCircCensus = totalCirc / censusPop;
-		}
-
-
-		if (!(magId in stateD)) {
-			stateD[magId] = {
-				'sortedDates': []
-			};
-		}
-		if (!(date in stateD[magId])) {
-			stateD[magId][date] = {
-				"totalMailSubs": 0, 
-				"totalSingleCopies": 0,
-				"totalTotalCirc": 0,
-				"maxMailSubs": 0,
-				"maxSingleCopies": 0,
-				"maxTotalCirc": 0,
-				"maxCensusMail": 0,
-				"maxCensusSingle": 0,
-				"maxCensusTotal": 0
-			};
-			stateD[magId].sortedDates.push(date);
-		}
-		if (!(state in stateD[magId][date])) {
-			stateD[magId][date][state] = {};
-		}
-
-		stateD[magId][date][state] = {
-			"mailSubs": mailSubs, 
-			"singleCopies": singleCopies,
-			"totalCirc": totalCirc,
-			"sampleIssueDate": sampleIssueDate,
-			"censusPop": censusPop,
-			"mailSubsCensus": mailSubsCensus, //highest proportion of mailsubs/census of state
-			"singleCopiesCensus": singleCopiesCensus,
-			"totalCircCensus": totalCircCensus
-		};
-
-		/*
-		Find the max while loading the data
-		*/
-		if (stateD[magId][date].maxSingleCopies < singleCopies) {
-			stateD[magId][date].maxSingleCopies = singleCopies;
-		}
-		if (stateD[magId][date].maxMailSubs < mailSubs) {
-			stateD[magId][date].maxMailSubs = mailSubs;
-		}
-		if (stateD[magId][date].maxTotalCirc < totalCirc) {
-			stateD[magId][date].maxTotalCirc = totalCirc;
-		}
-		if (stateD[magId][date].maxCensusMail < mailSubsCensus) {
-			stateD[magId][date].maxCensusMail = mailSubsCensus;
-		}
-		if (stateD[magId][date].maxCensusSingle < singleCopiesCensus) {
-			stateD[magId][date].maxCensusSingle = singleCopiesCensus;
-		}
-		if (stateD[magId][date].maxCensusTotal < totalCircCensus) {
-			stateD[magId][date].maxCensusTotal = totalCircCensus;
-		}
-
-		
-		stateD[magId][date]["totalMailSubs"] += mailSubs;	
-		stateD[magId][date]["totalSingleCopies"] += singleCopies;
-		stateD[magId][date]["totalTotalCirc"] += totalCirc;
-	}
-
-	for (var magId in stateD) {
-		stateD[magId].sortedDates.sort();
-	}
-
-	return stateD;
-}
 
 /*
 - State name
@@ -328,105 +148,58 @@ raw numbers
 
 */
 
+/**
+Main data structure
+*/
 var map = {
 	"currMagId":1,
 	"currDateId":"1931-06-30",
-	"mapData":{}, //data for a certain mag and date, dict keys states
+	"mapData":{}, //data for a certain mag and date: keys are states
 	"sortedDates":[],
-	"dataType": "totalCirc", //either newstand/single or mailsub D83200
-	"dataTransformation":"raw",
-	"displayPercentage":true,
-	"currMap":0,
+	"dataType": "totalCirc", //either newstand/single, mailsub, or totalCirc D83200
+	"dataTransformation":"raw", //either % of state pop(census), % of total circ, or raw numbers
 
 	scaleColor: d3.scaleLinear().range(["#FFED90", "#FF4D21"]),
-	setData: function() { //sets data to the current mag id and date
-		map.mapData = stateD[map.currMagId][map.currDateId];
-		map.sortedDates = stateD[map.currMagId].sortedDates;
+
+	setData: function() { //sets data to the current mag id
+		/**
+		IN FUTURE: WHEN HAVING CUSTOM QUERIES
+		-Check if magId in magData
+		-If not:
+			-Make query in here with while loop running until it is finished/received
+				-Timeout if more than 10 seconds and display error message
+			-Add data to magData: magData[map.currMagId] = object that is the result of the query
+					//specification of object format is in "separateData()"
+				//can actually just use separateData and pass in query response, just extract separateData()[map.currMagId]
+		-Proceed as we have now
+		*/
+
+
+
+		map.mapData = magData[map.currMagId][map.currDateId];
+		map.sortedDates = magData[map.currMagId].sortedDates;
 	},
-	setInitialDate: function() {
+	setInitialDate: function() { //sets data to initial date
 		map.currDateId = map.sortedDates[0];
 		map.setData();
 	},
-	setScaleColor: function() {
+	setScaleColor: function() { //sets the scaleColor according to the map's attributes
 		var domainMax = map.getSelectedMaxData();
 		map.scaleColor
 			.domain([0, domainMax]);
 	},
-	updateMap: function() {
+	updateMap: function() { //update map coloring based on map's attributes
 		geoMapPath
-		.transition()
-		.style("fill", function(d) {
-			var state = d.properties.name;
-			if (!(state in map.mapData)) {
-				return "#000000";
-			}
-			return map.scaleColor(map.getSelectedData(map.mapData[state]));
-		})
+			.transition()
+			.style("fill", function(d) {
+				var state = d.properties.name;
+				if (!(state in map.mapData)) {
+					return "#000000";
+				}
+				return map.scaleColor(map.getSelectedData(map.mapData[state]));
+			})
 	},
-	getSelectedData : function(mapStateData) {
-		var rawNumber;
-		var totalNumber;
-		var censusRelativeNumber;
-		if (map.dataType == "newsStand") {
-			rawNumber = mapStateData.singleCopies;
-			totalNumber = map.mapData.totalSingleCopies;
-			censusRelativeNumber = mapStateData.singleCopiesCensus;
-		} else if(map.dataType == "mailSubs") {
-			rawNumber = mapStateData.mailSubs;
-			totalNumber = map.mapData.totalMailSubs;
-			censusRelativeNumber = mapStateData.mailSubsCensus;
-		}
-		else if (map.dataType == "totalCirc") {
-			rawNumber = mapStateData.totalCirc;
-			totalNumber = map.mapData.totalTotalCirc;
-			censusRelativeNumber = mapStateData.totalCircCensus;
-		}
-
-
-		if (map.dataTransformation == "propTotalCirc") {
-			return rawNumber/totalNumber;
-		} else if (map.dataTransformation == "propStatePop") {
-			return censusRelativeNumber;
-		} 
-		else if (map.dataTransformation == "raw") {
-			return rawNumber;
-		}
-		console.log("Data type and Data Transformation are not valid")
-		return 0;
-	},
-	getSelectedMaxData: function() {
-		var rawNumber;
-		var totalNumber;
-		var censusRelativeNumber;
-		if (map.dataType == "newsStand") {
-			rawNumber = map.mapData.maxSingleCopies;
-			totalNumber = map.mapData.totalSingleCopies;
-			censusRelativeNumber = map.mapData.maxCensusSingle;
-		} else if(map.dataType == "mailSubs") {
-			rawNumber = map.mapData.maxMailSubs;
-			totalNumber = map.mapData.totalMailSubs;
-			censusRelativeNumber = map.mapData.maxCensusMail;
-		}
-		else if (map.dataType == "totalCirc") {
-			rawNumber = map.mapData.maxTotalCirc;
-			totalNumber = map.mapData.totalTotalCirc;
-			censusRelativeNumber = map.mapData.maxCensusTotal;
-		}
-
-
-		if (map.dataTransformation == "propTotalCirc") {
-			return rawNumber/totalNumber;
-		} else if (map.dataTransformation == "propStatePop") {
-			return censusRelativeNumber;
-		} 
-		else if (map.dataTransformation == "raw") {
-			return rawNumber;
-		}
-		console.log("Data type and Data Transformation are not valid")
-		return 0;
-	},
-	updateLegendScale: function() {
-		//no need to enter data
+	updateLegendScale: function() { //update legend on bottom right corner based on map's attributes
 		var min = 0;
 		var max = map.getSelectedMaxData();
 
@@ -481,7 +254,76 @@ var map = {
 				}
 			})
 	},
-	getFormattedDataName: function() {
+	updateTitle: function() { //change the header title according to the map's parameters
+		var magName = magIdMap[map.currMagId];
+		var magType = map.getFormattedDataName();
+		var magDate = map.currDateId;
+
+		$("#map-title").html(
+			magName + " " + magType + " Sales for " + magDate
+			);
+	},
+	getSelectedData : function(mapStateData) { //given data for a specific state for a specific date return the selected metric
+		var rawNumber;
+		var totalNumber;
+		var censusRelativeNumber;
+		if (map.dataType == "newsStand") {
+			rawNumber = mapStateData.singleCopies;
+			totalNumber = map.mapData.totalSingleCopies;
+			censusRelativeNumber = mapStateData.singleCopiesCensus;
+		} else if(map.dataType == "mailSubs") {
+			rawNumber = mapStateData.mailSubs;
+			totalNumber = map.mapData.totalMailSubs;
+			censusRelativeNumber = mapStateData.mailSubsCensus;
+		}
+		else if (map.dataType == "totalCirc") {
+			rawNumber = mapStateData.totalCirc;
+			totalNumber = map.mapData.totalTotalCirc;
+			censusRelativeNumber = mapStateData.totalCircCensus;
+		}
+
+		if (map.dataTransformation == "propTotalCirc") {
+			return rawNumber/totalNumber;
+		} else if (map.dataTransformation == "propStatePop") {
+			return censusRelativeNumber;
+		} 
+		else if (map.dataTransformation == "raw") {
+			return rawNumber;
+		}
+		console.log("Data type and Data Transformation are not valid")
+		return 0;
+	},
+	getSelectedMaxData: function() { //return the maxes of the data
+		var rawNumber;
+		var totalNumber;
+		var censusRelativeNumber;
+		if (map.dataType == "newsStand") {
+			rawNumber = map.mapData.maxSingleCopies;
+			totalNumber = map.mapData.totalSingleCopies;
+			censusRelativeNumber = map.mapData.maxCensusSingle;
+		} else if(map.dataType == "mailSubs") {
+			rawNumber = map.mapData.maxMailSubs;
+			totalNumber = map.mapData.totalMailSubs;
+			censusRelativeNumber = map.mapData.maxCensusMail;
+		}
+		else if (map.dataType == "totalCirc") {
+			rawNumber = map.mapData.maxTotalCirc;
+			totalNumber = map.mapData.totalTotalCirc;
+			censusRelativeNumber = map.mapData.maxCensusTotal;
+		}
+
+		if (map.dataTransformation == "propTotalCirc") {
+			return rawNumber/totalNumber;
+		} else if (map.dataTransformation == "propStatePop") {
+			return censusRelativeNumber;
+		} 
+		else if (map.dataTransformation == "raw") {
+			return rawNumber;
+		}
+		console.log("Data type and Data Transformation are not valid")
+		return 0;
+	},
+	getFormattedDataName: function() { //get the map's attributes in a formatted string
 		var magType;
 		if (map.dataType == "totalCirc") {
 			magType = "Total Circulation";
@@ -505,8 +347,100 @@ var map = {
 	}
 }
 
+
+/**
+Set up the d3.js svgs and graphics
+*/
+
+var width = 940;
+var height = 600;
+
+var projection = d3.geoAlbersUsa()
+			.translate([width/2, height/2]);
+
+var path = d3.geoPath()
+		.projection(projection);
+
+var svg = d3.select("#svg")
+	.append("svg")
+	.attr("width", width)
+	.attr("height", height);
+
+var gMap = svg.append("g")
+	.attr("width", width)
+	.attr("height", height);
+
+var gLegendScale = svg.append("g")
+	.attr("width", width)
+	.attr("height", height);
+
+var toolTip = d3.select("#toolTip")
+	.style("display", "None");
+
+svg.on("mouseout", function() {
+		toolTip.transition()
+			.style("display", "None")
+	})
+	.on("mouseover", function() {
+		toolTip.transition()
+			.style("display", "block")
+	})
+
+
+
+var legendHeight = 25;
+var legendCellWidth = 25;
+gLegendScale.selectAll("rect")
+	.data([0,0,0,0,0,0,0]) //7 rects
+	.enter()
+	.append("rect")
+	.attr("x", function(d, i) {
+		return width-legendCellWidth*8+i*legendCellWidth;
+	})
+	.attr("y", height - legendHeight*2)
+	.attr("width", legendCellWidth)
+	.attr("height", legendHeight)
+	.attr("stroke", "#ffffff")
+	.attr("stroke-width", 1)
+	.attr("fill", "#ffffff");
+
+gLegendScale.selectAll("text")
+	.data([0,0,0,0,0,0,0]) //7 spots for text
+	.enter()
+	.append("text")
+	.attr("x", function(d, i) {
+		return width-legendCellWidth*8+i*legendCellWidth + (legendCellWidth/2);
+	})
+	.attr("y", height - legendHeight*0.8)
+	.attr("font-size", "10px")
+	.attr("fill", "#444444")
+	// .style("font-family", "")
+	.style("text-anchor", "middle")
+	.style("alignment-baseline", "central");
+	// .attr("stroke", "#ffffff")
+	// .attr("stroke-width", 1)
+	// .attr("fill", "#ff00ff");
+
+var gLegendSuffix = svg.append("g") //for the % or epower
+	.attr("width", width)
+	.attr("height", height);
+
+gLegendSuffix.selectAll("text")
+	.data([0])
+	.enter()
+	.append("text")
+	.attr("x", function(d) {
+		return width - 18;
+	})
+	.attr("y", height - legendHeight*0.8)
+	.attr("font-size", "10px")
+	.attr("fill", "#444444")
+	.style("text-anchor", "middle")
+	.style("alignment-baseline", "central")
+	.text("%");
+
 var geoMapPath = gMap.selectAll("path")
-	.data(statesJson.features)
+	.data(statesJson.features) //loaded from a js file (local)
 	.enter()
 	.append("path")
 	.attr("d", path)
@@ -514,8 +448,11 @@ var geoMapPath = gMap.selectAll("path")
 	.style("stroke-width", 1)
 	.style("fill", "#ffffff")
 	.on("mouseover", function(d) {
-		var mouseX = d3.event.pageX;
-		var mouseY = d3.event.pageY;
+		mouse = d3.mouse(this);
+		var mouseX = mouse[0];
+		var mouseY = mouse[1];
+		// var mouseX = d3.event.pageX;
+		// var mouseY = d3.event.pageY;
 
 		var stateName = d.properties.name;
 		var mapStateData = map.mapData[stateName];
@@ -536,13 +473,27 @@ var geoMapPath = gMap.selectAll("path")
 
 		var innerHtml = "<tr><td>Total Circulation:</td> <td align=center>"+totalCirc+"</td> </tr>";
 
-		if (map.dataType != "totalCirc" || map.dataTransformation != "raw") {
+		if (map.dataType == "totalCirc" && map.dataTransformation == "raw") { //the default is to show total, mailsubs, and newstand sales
+			var mailSubs = mapStateData.mailSubs;
+			var singleCopies = mapStateData.singleCopies;
+			innerHtml += "<tr><td>"+"Newsstand"+":</td> <td align=center>"+mailSubs+"</td> </tr>"
+
+			innerHtml += "<tr><td>"+"Mail Subscription"+":</td> <td align=center>"+singleCopies+"</td> </tr>"
+		}
+
+		if (map.dataType != "totalCirc" || map.dataTransformation != "raw") { //if the selector is not totalCirc raw, add another metric
 			innerHtml += "<tr><td>"+metricName+":</td> <td align=center>"+selectedMetric+"</td> </tr>";
 		}
 
+		if (map.dataTransformation == "propStatePop") { //case for prop of state pop, need census data as well
+			innerHtml += "<tr><td>"+"State Population"+":</td> <td align=center>"+mapStateData.censusPop+"</td> </tr>";
+		}
+
 		toolTip
-			.style("top", mouseY - 50 + "px")
-			.style("left", mouseX - 400 + "px")
+			// .style("top", mouseY - 50 + "px")
+			// .style("left", mouseX - 400 + "px")
+			.style("top", mouseY+"px")
+			.style("left", mouseX+"px")
 			.html( "<b style='align:center;'>"+stateName+ " (" + magTitle+ ")</b>" +
 			"<table style='font-size:12px; margin-top:4px;' cellpadding=0 cellspacing=0>" +
 				innerHtml +
@@ -550,131 +501,240 @@ var geoMapPath = gMap.selectAll("path")
 	});
 
 
+/**
+Given a list of rows of data, converts it to the following structure
+//magId:date:state:{mailSubs, singleCopies}
+*/
+function separateData(data) {
+	var magData = {}; //magId:date:state:{mailSubs, singleCopies}
+	for (var i = 0; i < data.length; i++) {
+		var row = data[i];
+		var magId = row.magazine_id;
+		var date = row.sample_period_end_date;
+		var sampleIssueDate = row.sample_issue_date;
+		var state = row.State;
+		var mailSubs = +row.num_mail_subscriptions;
+		var singleCopies = +row.num_single_copy_sales;
+		var totalCirc = mailSubs + singleCopies;
 
-function selectMag(magId) {
-	map.currMagId = magId;
+		var decadeDate = date.substring(0, 3) + "0"; //1927 goes to 1920 (round down census data lookup date)
+		var censusPop = 0;
 
-	map.setData()
-	map.setInitialDate();
-	map.setScaleColor()
-	map.updateMap()
-	map.updateLegendScale();
-	$("#mag-date-selector").html(genDateSelection());
-	var dates = map.sortedDates;
-	updateSliderRange(dates.length - 1);
-}
-
-function selectDate(date) {
-	map.currDateId = date;
-	map.setData()
-	map.setScaleColor()
-	map.updateMap()
-	map.updateLegendScale();
-	updateTitle();
-}
-
-function selectDataType(dataType) {
-	map.dataType = dataType;
-	map.setScaleColor()
-	map.updateMap()
-	map.updateLegendScale();
-	updateTitle();
-}
-
-function selectTransformation(transformationType) {
-	map.dataTransformation = transformationType;
-
-    map.setData()
-	map.setScaleColor()
-	map.updateMap()
-	map.updateLegendScale();
-	updateTitle();
-}
-
-function selectPresentation(presentation) {
-	map.displayPercentage = presentation == "percentage";
-	map.updateLegendScale();
-}
-
-function updateTitle() {
-	var magName = magIdMap[map.currMagId];
-	var magType = map.getFormattedDataName();
-	var magDate = map.currDateId;
-
-	$("#map-title").html(
-		magName + " " + magType + " Sales for " + magDate
-		);
-}
-
-function onSliderChange(i) {
-	var selectedDate = map.sortedDates[i];
-
-	if (selectedDate == map.currDateId) {
-		return;
-	}
-	selectDate(selectedDate);
-}
-
-function updateSliderRange(newMax) {
-	$("#slider-labels").find("label").remove();
-
-	$("#slider").slider("option", "max", newMax);
-	var slider = $("#slider").slider("value", 0);
-
-
-	slider.each(function() {
-		var sliderParams = $(this).data().uiSlider.options;
-
-		var max = sliderParams.max;
-		var min = sliderParams.min;
-		var step = sliderParams.step;
-
-		var nVals = (max-min)/step;
-
-		var sortedDates = map.sortedDates;
-		for (var i = 0; i < nVals + 1; i++) {
-			var ele = $('<label>' +sortedDates[i]+ '</label>')
-				.css("top", 98 - (i/nVals*100) + "%")
-				.css("left", "35%")
-				.css("position", "absolute")
-				.css("font-size", "10px");
-				// .css("padding", "100px");
-			$("#slider-labels").append(ele);
+		var mailSubsCensus = 0;
+		var singleCopiesCensus = 0;
+		var totalCircCensus = 0;
+		if (state in stateCensusData) {
+			censusPop = stateCensusData[state][decadeDate];
+			mailSubsCensus = mailSubs / censusPop;
+			singleCopiesCensus = singleCopies / censusPop;
+			totalCircCensus = totalCirc / censusPop;
 		}
-	});
 
+
+		if (!(magId in magData)) {
+			magData[magId] = {
+				'sortedDates': []
+			};
+		}
+		if (!(date in magData[magId])) {
+			magData[magId][date] = {
+				"totalMailSubs": 0, 
+				"totalSingleCopies": 0,
+				"totalTotalCirc": 0,
+				"maxMailSubs": 0,
+				"maxSingleCopies": 0,
+				"maxTotalCirc": 0,
+				"maxCensusMail": 0,
+				"maxCensusSingle": 0,
+				"maxCensusTotal": 0
+			};
+			magData[magId].sortedDates.push(date);
+		}
+		if (!(state in magData[magId][date])) {
+			magData[magId][date][state] = {};
+		}
+
+		magData[magId][date][state] = {
+			"mailSubs": mailSubs, 
+			"singleCopies": singleCopies,
+			"totalCirc": totalCirc,
+			"sampleIssueDate": sampleIssueDate,
+			"censusPop": censusPop,
+			"mailSubsCensus": mailSubsCensus, //highest proportion of mailsubs/census of state
+			"singleCopiesCensus": singleCopiesCensus,
+			"totalCircCensus": totalCircCensus
+		};
+
+		/*
+		Find the max while loading the data
+		*/
+		if (magData[magId][date].maxSingleCopies < singleCopies) {
+			magData[magId][date].maxSingleCopies = singleCopies;
+		}
+		if (magData[magId][date].maxMailSubs < mailSubs) {
+			magData[magId][date].maxMailSubs = mailSubs;
+		}
+		if (magData[magId][date].maxTotalCirc < totalCirc) {
+			magData[magId][date].maxTotalCirc = totalCirc;
+		}
+		if (magData[magId][date].maxCensusMail < mailSubsCensus) {
+			magData[magId][date].maxCensusMail = mailSubsCensus;
+		}
+		if (magData[magId][date].maxCensusSingle < singleCopiesCensus) {
+			magData[magId][date].maxCensusSingle = singleCopiesCensus;
+		}
+		if (magData[magId][date].maxCensusTotal < totalCircCensus) {
+			magData[magId][date].maxCensusTotal = totalCircCensus;
+		}
+
+		
+		magData[magId][date]["totalMailSubs"] += mailSubs;	
+		magData[magId][date]["totalSingleCopies"] += singleCopies;
+		magData[magId][date]["totalTotalCirc"] += totalCirc;
+	}
+
+	for (var magId in magData) {
+		magData[magId].sortedDates.sort();
+	}
+
+	return magData;
 }
 
 
-function genDateSelection() {
-  var start = '<select class="form-control mag-date-select">';
-  for (var i in map.sortedDates) {
-  	var date = map.sortedDates[i];
-  	start+="<option value='"+date+"'>"+date+"</option>";
-  }
-  var end = '</select>';
-  return start+end;
-}
 
+
+
+
+/**
+jQuery and request to php to get database data
+*/
 
 var magIdMap = {};
 
 var idMagMap = {};
 
+
+var MAX_N_DATES_SLIDER = 10;
+
+
 $.when(dbQuery("magazines"), dbQuery("circ_data_by_loc_with_statenames")).done(function(csvMag, csvGeoCirc){
 	var circData = d3.csvParse(csvGeoCirc[0], function(d){
 		return d;
 	});
-	stateD = separateData(circData);
+	magData = separateData(circData);
 
 	d3.csvParse(csvMag[0], function(d){
-		if (d.magazine_id in stateD) {
+		if (d.magazine_id in magData) {
 			magIdMap[d.magazine_id] = d.title;
 			idMagMap[d.title] = d.magazine_id;
 		}
 	});
 
 	$(document).ready(function(){
+		function selectMag(magId) {
+			map.currMagId = magId;
+
+			map.setData()
+			map.setInitialDate();
+			map.setScaleColor()
+			map.updateMap()
+			map.updateLegendScale();
+			$("#mag-date-selector").html(genDateSelection());
+			var dates = map.sortedDates;
+			updateSliderRange(dates.length - 1);
+		}
+
+		function selectDate(date) {
+			map.currDateId = date;
+			map.setData()
+			map.setScaleColor()
+			map.updateMap()
+			map.updateLegendScale();
+			map.updateTitle();
+		}
+
+		function selectDataType(dataType) {
+			map.dataType = dataType;
+			map.setScaleColor()
+			map.updateMap()
+			map.updateLegendScale();
+			map.updateTitle();
+		}
+
+		function selectTransformation(transformationType) {
+			map.dataTransformation = transformationType;
+
+		    map.setData()
+			map.setScaleColor()
+			map.updateMap()
+			map.updateLegendScale();
+			map.updateTitle();
+		}
+
+		function onSliderChange(i) {
+			var selectedDate = map.sortedDates[i];
+
+			if (selectedDate != map.currDateId) {
+				selectDate(selectedDate);
+			}
+		}
+
+		function updateSliderRange(newMax) {
+			$("#slider-labels").find("label").remove();
+
+			$("#slider").slider("option", "max", newMax);
+			var slider = $("#slider").slider("value", 0);
+
+
+			slider.each(function() {
+				var sliderParams = $(this).data().uiSlider.options;
+
+				var max = sliderParams.max;
+				var min = sliderParams.min;
+				var step = sliderParams.step;
+
+
+				var sortedDates = map.sortedDates;
+
+
+				var nDates = Math.min(max-min, MAX_N_DATES_SLIDER);
+				for (var i = 0; i < nDates + 1; i++) { //only display at most MAX_N_DATES_SLIDER dates on the slider
+					var ele = $('<label>' +sortedDates[i]+ '</label>')
+						.css("top", 98 - (i/nDates*100) + "%")
+						.css("left", "35%")
+						.css("position", "absolute")
+						.css("font-size", "10px");
+						// .css("padding", "100px");
+					$("#slider-labels").append(ele);
+				}
+
+				// var nVals = (max-min)/step;
+				// for (var i = 0; i < nVals + 1; i++) { //only display at most 10 dates on the slider
+				// 	var ele = $('<label>' +sortedDates[i]+ '</label>')
+				// 		.css("top", 98 - (i/nVals*100) + "%")
+				// 		.css("left", "35%")
+				// 		.css("position", "absolute")
+				// 		.css("font-size", "10px");
+				// 		// .css("padding", "100px");
+				// 	$("#slider-labels").append(ele);
+				// }
+			});
+
+		}
+
+		function genDateSelection() {
+		  var start = '<select class="form-control mag-date-select">';
+		  for (var i in map.sortedDates) {
+		  	var date = map.sortedDates[i];
+		  	start+="<option value='"+date+"'>"+date+"</option>";
+		  }
+		  var end = '</select>';
+		  return start+end;
+		}
+
+
+
+
 		//build the slider
 		var slider = $("#slider").slider({
 			orientation: 'vertical',
@@ -691,8 +751,9 @@ $.when(dbQuery("magazines"), dbQuery("circ_data_by_loc_with_statenames")).done(f
 		selectMag("1"); //select default to be BlackMask
 		map.updateMap();
 		map.updateLegendScale();
-		updateTitle();
-		updateSliderRange(stateD[map.currMagId].sortedDates.length - 1);
+		map.updateTitle();
+		// updateSliderRange(magData[map.currMagId].sortedDates.length - 1);
+		updateSliderRange(map.sortedDates.length - 1);
 
 
 		function genMagSelection() {
@@ -713,7 +774,7 @@ $.when(dbQuery("magazines"), dbQuery("circ_data_by_loc_with_statenames")).done(f
 		    var magName = $(this).children(":selected").val();
 		    var magId = idMagMap[magName];
 		    selectMag(magId);
-			updateTitle();
+			map.updateTitle();
 		  });
 
 		$(document).on("change", ".mag-date-select", function(){ //on select date
