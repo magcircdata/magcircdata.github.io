@@ -1,0 +1,5 @@
+pip install --upgrade google-api-python-client
+oauth
+apiclient
+MySQLDB
+httplib2
