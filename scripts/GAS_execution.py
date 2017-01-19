@@ -21,6 +21,8 @@ import json
 SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Python-GAS Spreadsheet Data Script'
+CREDENTIALS_CACHE = []
+
 
 
 def get_credentials():
@@ -32,6 +34,9 @@ def get_credentials():
     Returns:
         Credentials, the obtained credential.
     """
+    if len(CREDENTIALS_CACHE) != 0:
+        return CREDENTIALS_CACHE[0]
+
     home_dir = os.path.expanduser('~')
     credential_dir = os.path.join(home_dir, '.credentials')
     if not os.path.exists(credential_dir):
@@ -40,7 +45,6 @@ def get_credentials():
                                    'script-python-quickstart.json')
 
     store = Storage(credential_path)
-
 #use if you want to store credentials locally
     # credentials = store.get()
     # if not credentials or credentials.invalid:
@@ -61,12 +65,19 @@ def get_credentials():
         credentials = tools.run_flow(flow, store, flags)
     else: # Needed only for compatibility with Python 2.6
         credentials = tools.run(flow, store)
+
+    CREDENTIALS_CACHE.append(credentials)
     return credentials
 
-def get_spreadsheet_data():
+def get_spreadsheet_data(fn_request):
     """Makes a call to the GAS script to get SS data
 
     Takes in a parameter that denotes the specific type of parameter
+
+    Current options for fn_request:
+    "getGeoData"
+    "getMagazineIdLookupTable"
+
     """
     SCRIPT_ID = '11haDlAIieNhugt6puckZJ1Js1XoXCCrgz8WcRzzzskgodfiDDjmLss1J'
 
@@ -76,7 +87,7 @@ def get_spreadsheet_data():
     service = discovery.build('script', 'v1', http=http)
 
     # Create an execution request object.
-    request = {"function": "getGeoData"}
+    request = {"function": fn_request}
 
     try:
         # Make the API request.
@@ -104,12 +115,3 @@ def get_spreadsheet_data():
     except errors.HttpError as e:
         # The API encountered a problem before the script started executing.
         print(e.content)
-
-
-
-if __name__ == '__main__':
-    circ_response = get_spreadsheet_data()
-    headers = circ_response['headers']
-    circ_data = circ_response['data']
-
-    print circ_data
